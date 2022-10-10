@@ -1,5 +1,6 @@
 import gym
 import numpy as np
+from collections import deque
 from gym.utils.play import play
 
 
@@ -15,8 +16,20 @@ def create_callback(_sample_out_file, _label_out_file, **kwargs):
     def my_callback(obs_t, obs_tp1, action, reward, terminated, truncated, info):
         nonlocal last_img
 
+    image_buffer = deque(maxlen=image_buffer_length)
+    action_buffer = deque(maxlen=image_buffer_length)
+
+    def my_callback(obs_t, obs_tp1, action, reward, terminated, truncated, info):
+        nonlocal last_img
+        nonlocal image_buffer
+
         if type(obs_t) is tuple:
             return
+
+        if reward > 0:
+            for idx in range(len(image_buffer)):
+                np.savetxt(_sample_out_file, X=image_buffer[idx].reshape(1, -1), fmt='%03d')
+                _label_out_file.write(f'{max(0, action_buffer[idx] - 1)}\n')
 
         cropped_img = crop_image(obs_t, **kwargs)
 
@@ -34,6 +47,9 @@ def create_callback(_sample_out_file, _label_out_file, **kwargs):
 
             np.savetxt(_sample_out_file, X=diff_img.reshape(1, -1), fmt='%03d')
             _label_out_file.write(f'{max(0, action - 1)}\n')
+
+            image_buffer.append(diff_img)
+            action_buffer.append(action)
 
         last_img = cropped_img.astype(np.int16) * 0.75
 
@@ -53,6 +69,8 @@ image_args = {
 sample_out_file_path = 'text_files/X.txt'
 label_out_file_path = 'text_files/y.txt'
 
+image_buffer_length = 30
+
 if __name__ == '__main__':
     env = gym.make('Pong-v4', render_mode='rgb_array')
     env.reset()
@@ -63,6 +81,13 @@ if __name__ == '__main__':
     callback = create_callback(sample_out_file, label_out_file, **image_args)
 
     gym.utils.play.play(env, zoom=3, fps=12, callback=callback)
+
+    sample_out_file = open(sample_out_file_path, 'a')
+    label_out_file = open(label_out_file_path, 'a')
+
+    callback = create_callback(sample_out_file, label_out_file, **image_args)
+
+    gym.utils.play.play(env, zoom=5, fps=12, callback=callback)
 
     sample_out_file.close()
     label_out_file.close()

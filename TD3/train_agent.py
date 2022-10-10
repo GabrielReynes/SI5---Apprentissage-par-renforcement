@@ -1,14 +1,22 @@
-from tensorflow import keras
-from keras import layers, utils
-from sklearn.metrics import f1_score, multilabel_confusion_matrix
-from gym_record import image_args, label_out_file_path, sample_out_file_path
 import numpy as np
-
+from keras import layers, utils
+from keras.callbacks import EarlyStopping
+from sklearn.metrics import f1_score, multilabel_confusion_matrix
+from tensorflow_addons.metrics import F1Score
 from sklearn.model_selection import train_test_split
+from tensorflow import keras
+
+from gym_record import image_args, label_out_file_path, sample_out_file_path
 
 model_save_path = "agents/first-model"
 nb_classes = 3
 feature_range = 256
+
+f1_metric = F1Score(num_classes=nb_classes, average='weighted')
+
+callbacks_list = [EarlyStopping(monitor='val_f1_score', min_delta=0.0005,
+                                patience=20, verbose=1, mode='max',
+                                restore_best_weights=True)]
 
 if __name__ == '__main__':
     feature_width = (image_args['x_axis_max'] - image_args['x_axis_min']) // image_args['x_axis_step']
@@ -31,6 +39,17 @@ if __name__ == '__main__':
     model.add(layers.Dense(nb_classes, activation='softmax'))
     model.compile(optimizer='adam', loss='categorical_crossentropy')
     model.fit(X_train, y_train, epochs=10, validation_split=0.1, verbose=1)
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+
+    model = keras.Sequential()
+    model.add(layers.Conv2D(32, 5, input_shape=(feature_height, feature_width, 1), activation='relu'))
+    model.add(layers.Flatten())
+    model.add(layers.Dense(64, activation='relu'))
+    model.add(layers.Dense(64, activation='relu'))
+    model.add(layers.Dense(nb_classes, activation='softmax'))
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=[f1_metric])
+    model.fit(X_train, y_train, epochs=100, batch_size=20, validation_split=0.33, verbose=1, callbacks=callbacks_list)
 
     y_pred = model.predict(X_test)
 
