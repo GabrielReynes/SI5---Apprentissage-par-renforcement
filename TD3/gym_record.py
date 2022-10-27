@@ -19,7 +19,7 @@ def create_callback(_sample_out_file, _label_out_file, **kwargs):
     image_buffer = deque(maxlen=image_buffer_length)
     action_buffer = deque(maxlen=image_buffer_length)
 
-    def my_callback(obs_t, obs_tp1, action, reward, terminated, truncated, info):
+    def my_callback(obs_t, obs_tp1, action, reward, *args):
         nonlocal last_img
         nonlocal image_buffer
 
